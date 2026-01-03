@@ -38,3 +38,4 @@ python main.py
 3. Paper Trading Modus wählen (Option 1)
 
 Cleanup durchgeführt: 22.12.2025 20:11
+"# Test der stabilen Git-Verbindung" 
