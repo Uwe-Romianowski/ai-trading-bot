@@ -1,0 +1,1 @@
+# Kernklassen für Paper Trading

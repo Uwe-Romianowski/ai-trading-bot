@@ -1,15 +1,135 @@
+# ============================================
+# OPTIMIERTE .gitignore FÜR AI TRADING BOT v4.0
+# Generiert am: 2026-01-03 18:55:27
+# ============================================
+
+# 1. BYTE-COMPILED / OPTIMIZED PYTHON FILES
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 2. PYTHON UMGEBUNGEN & VIRTUAL ENVS
 .env
 .venv
-.vscode/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+pythonenv*
+
+# 3. PYCHARM & VS CODE IDE FILES
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
+*.orig
+*.bak
+
+# 4. UNIT TESTS & COVERAGE
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+test_output/
+*.pytest_cache
+
+# 5. OPERATING SYSTEM FILES
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
+
+# 6. JUPYTER NOTEBOOKS & IPYTHON
+.ipynb_checkpoints/
+*.ipynb
+.ipython/
+
+# 7. TRADING-BOT SPEZIFISCHE IGNORES
+# ------------------------------------
+# Temporäre Backtest-Daten (können regeneriert werden)
+data/performance/session_*.json
+
+# ML-Training-Zwischenergebnisse
+data/models/training_*.pkl
+data/models/temp_*
+
+# Sensible Zustandsdateien (lokal speichern)
+data/self_improvement_state.json
+
+# Temporäre Logs und Caches
 *.log
-data_storage/
+logs/
+cache/
+tmp/
+temp/
+
+# MT5-spezifische temporäre Dateien
+*.chr
+*.dat
+
+# 8. LARGE DATA FILES (bereits mit Git LFS verwaltet)
+# HINWEIS: Diese Dateien werden bereits von Git LFS verwaltet
+# und sollten NICHT hier ignoriert werden:
+# data/raw/eurusdm5_2002_2019.csv
+# data/processed/X_eurusd_float32.npy
+# data/processed/y_eurusd.npy
+
+# 9. PROJEKT-METADATEN
+.project
+.pydevproject
+.settings/
+*.sublime-*
+*.komodoproject
+
+# 10. WINDOWS SPEZIFISCHES
+[Tt]humbs.db
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+*.aps
+*.ncb
+*.opensdf
+*.sdf
+Cache/
+Backup*/
+[Tt]emp*/
+
+# ============================================
+# ENDE OPTIMIERTE .gitignore
+# ============================================
