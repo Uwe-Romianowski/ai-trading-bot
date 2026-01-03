@@ -1,0 +1,15 @@
+# Core
+pandas==2.2.3
+numpy==2.2.6
+pyyaml==6.0.2
+
+# Machine Learning
+scikit-learn==1.7.2
+joblib==1.4.3
+
+# Forex & Trading
+MetaTrader5==5.0.5388
+
+# Utilities
+python-dateutil==2.9.0
+pytz==2025.2

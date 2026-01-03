@@ -1,0 +1,31 @@
+============================================================
+ML MODELL TRAINING RESULTS - PHASE A.2
+============================================================
+
+DATASET:
+  Samples total: 10,000
+  Features per sample: 4,300
+  Train samples: 7,000
+  Test samples:  3,000
+
+MODEL PARAMETERS:
+  n_estimators: 100
+  max_depth: 15
+  min_samples_split: 5
+  min_samples_leaf: 2
+  max_features: sqrt
+  random_state: 42
+  n_jobs: -1
+  verbose: 1
+  class_weight: balanced
+
+RESULTS:
+  Accuracy:  0.5127
+  Precision: 0.5177
+  Recall:    0.4752
+  F1-Score:  0.4955
+  ROC-AUC:   0.5246
+
+CONFUSION MATRIX:
+  TN: 820, FP: 669
+  FN: 793, TP: 718

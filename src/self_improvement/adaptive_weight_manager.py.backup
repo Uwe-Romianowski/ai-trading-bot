@@ -1,0 +1,297 @@
+"""
+Adaptiver Weight Manager für ML/Rules Gewichtung
+Passt ML-Weight automatisch basierend auf Performance an
+"""
+
+import logging
+from typing import Dict, Tuple
+from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
+
+class AdaptiveWeightManager:
+    """
+    Verwaltet und passt ML/Rules Gewichtung automatisch an
+    """
+    
+    def __init__(self, 
+                 initial_ml_weight: float = 0.7,
+                 min_ml_weight: float = 0.3,
+                 max_ml_weight: float = 0.9,
+                 adjustment_step: float = 0.05):
+        """
+        Initialisiert den Adaptive Weight Manager
+        
+        Args:
+            initial_ml_weight: Startgewichtung für ML (0-1)
+            min_ml_weight: Minimale ML-Gewichtung
+            max_ml_weight: Maximale ML-Gewichtung
+            adjustment_step: Schrittgröße für Anpassungen
+        """
+        self.ml_weight = initial_ml_weight
+        self.rules_weight = 1.0 - initial_ml_weight
+        self.min_ml_weight = min_ml_weight
+        self.max_ml_weight = max_ml_weight
+        self.adjustment_step = adjustment_step
+        
+        # Anpassungs-History
+        self.adjustment_history = []
+        
+        # Performance-Tracking für Entscheidungen
+        self.performance_windows = {
+            'short': {'trades': [], 'start_time': None},
+            'medium': {'trades': [], 'start_time': None},
+            'long': {'trades': [], 'start_time': None},
+        }
+        
+        logger.info(f"Adaptive Weight Manager initialisiert: ML={self.ml_weight:.2f}, Rules={self.rules_weight:.2f}")
+    
+    def set_ml_weight(self, new_weight: float, reason: str = "Manual adjustment"):
+        """
+        Setzt ML-Gewichtung mit History-Tracking
+        
+        Args:
+            new_weight: Neue ML-Gewichtung (0-1)
+            reason: Grund für die Anpassung
+        """
+        old_weight = self.ml_weight
+        
+        # Begrenze auf erlaubten Bereich
+        new_weight = max(self.min_ml_weight, min(self.max_ml_weight, new_weight))
+        
+        self.ml_weight = new_weight
+        self.rules_weight = 1.0 - new_weight
+        
+        # Record adjustment
+        adjustment_record = {
+            'timestamp': datetime.now(),
+            'old_weight': old_weight,
+            'new_weight': new_weight,
+            'change': new_weight - old_weight,
+            'reason': reason
+        }
+        self.adjustment_history.append(adjustment_record)
+        
+        # Keep only last 100 adjustments
+        if len(self.adjustment_history) > 100:
+            self.adjustment_history.pop(0)
+        
+        logger.info(f"ML-Weight angepasst: {old_weight:.2f} -> {new_weight:.2f} ({reason})")
+    
+    def auto_adjust_based_on_performance(self, 
+                                        performance_tracker,
+                                        window_size: int = 30) -> Tuple[bool, str, float]:
+        """
+        Passt Gewichtung automatisch basierend auf Performance an
+        
+        Args:
+            performance_tracker: PerformanceTracker Instanz
+            window_size: Fenstergröße für Performance-Analyse
+            
+        Returns:
+            Tuple: (was_adjusted, reason, new_weight)
+        """
+        # Hole Performance-Daten
+        should_adjust, reason, suggested_change = performance_tracker.should_adjust_ml_weight(window_size)
+        
+        if not should_adjust:
+            return False, "No adjustment needed", self.ml_weight
+        
+        # Berechne neue Gewichtung
+        new_weight = self.ml_weight + suggested_change
+        
+        # Begrenze auf erlaubten Bereich
+        new_weight = max(self.min_ml_weight, min(self.max_ml_weight, new_weight))
+        
+        # Prüfe, ob Anpassung signifikant genug ist
+        if abs(new_weight - self.ml_weight) < self.adjustment_step / 2:
+            return False, f"Change too small: {abs(new_weight - self.ml_weight):.3f}", self.ml_weight
+        
+        # Führe Anpassung durch
+        old_weight = self.ml_weight
+        self.set_ml_weight(new_weight, f"Auto-adjust: {reason}")
+        
+        return True, reason, self.ml_weight
+    
+    def get_weight_recommendation(self, market_regime: str = None) -> Dict:
+        """
+        Gibt Gewichtungs-Empfehlung basierend auf Marktregime
+        
+        Args:
+            market_regime: 'TRENDING', 'RANGING', 'HIGH_VOLATILITY'
+            
+        Returns:
+            Dictionary mit Empfehlung
+        """
+        base_recommendation = {
+            'current_ml_weight': self.ml_weight,
+            'current_rules_weight': self.rules_weight,
+            'recommendation': 'Maintain current weights',
+            'confidence': 0.5
+        }
+        
+        if market_regime:
+            regime_recommendations = {
+                'TRENDING': {
+                    'recommended_ml_weight': min(0.8, self.ml_weight + 0.1),
+                    'reason': 'ML performs better in trending markets',
+                    'confidence': 0.7
+                },
+                'RANGING': {
+                    'recommended_ml_weight': max(0.4, self.ml_weight - 0.1),
+                    'reason': 'Rules-based systems often outperform in ranging markets',
+                    'confidence': 0.6
+                },
+                'HIGH_VOLATILITY': {
+                    'recommended_ml_weight': 0.5,  # Balanced approach
+                    'reason': 'High volatility requires balanced approach',
+                    'confidence': 0.8
+                }
+            }
+            
+            if market_regime in regime_recommendations:
+                rec = regime_recommendations[market_regime]
+                base_recommendation.update({
+                    'regime': market_regime,
+                    'recommended_ml_weight': rec['recommended_ml_weight'],
+                    'recommended_rules_weight': 1.0 - rec['recommended_ml_weight'],
+                    'reason': rec['reason'],
+                    'confidence': rec['confidence']
+                })
+        
+        return base_recommendation
+    
+    def record_trade_result(self, 
+                           symbol: str, 
+                           result_pips: float, 
+                           ml_confidence: float,
+                           used_ml_weight: float = None):
+        """
+        Zeichnet Trade-Ergebnis für spätere Analyse auf
+        
+        Args:
+            symbol: Trading-Symbol
+            result_pips: Ergebnis in Pips
+            ml_confidence: ML-Confidence für diesen Trade
+            used_ml_weight: Tatsächlich verwendetes ML-Weight
+        """
+        if used_ml_weight is None:
+            used_ml_weight = self.ml_weight
+        
+        trade_record = {
+            'timestamp': datetime.now(),
+            'symbol': symbol,
+            'result_pips': result_pips,
+            'ml_confidence': ml_confidence,
+            'used_ml_weight': used_ml_weight,
+            'is_win': result_pips > 0
+        }
+        
+        # Zu allen Windows hinzufügen
+        for window in self.performance_windows.values():
+            window['trades'].append(trade_record)
+        
+        # Alte Trades bereinigen
+        self._clean_old_trades()
+    
+    def _clean_old_trades(self):
+        """Entfernt alte Trades aus den Windows"""
+        time_windows = {
+            'short': timedelta(hours=6),
+            'medium': timedelta(days=3),
+            'long': timedelta(days=14)
+        }
+        
+        for window_name, window_data in self.performance_windows.items():
+            if window_name in time_windows:
+                cutoff = datetime.now() - time_windows[window_name]
+                window_data['trades'] = [
+                    t for t in window_data['trades']
+                    if t['timestamp'] > cutoff
+                ]
+    
+    def get_performance_by_weight_range(self) -> Dict:
+        """
+        Analysiert Performance nach ML-Weight Ranges
+        """
+        if not self.adjustment_history:
+            return {'error': 'No adjustment history available'}
+        
+        # Gruppiere Trades nach Weight-Ranges
+        weight_ranges = {
+            'low': (self.min_ml_weight, 0.5),
+            'medium': (0.5, 0.75),
+            'high': (0.75, self.max_ml_weight)
+        }
+        
+        results = {}
+        for range_name, (low, high) in weight_ranges.items():
+            # Finde Perioden mit dieser Weight-Range
+            period_trades = []
+            for i, adj in enumerate(self.adjustment_history):
+                if i < len(self.adjustment_history) - 1:
+                    next_adj = self.adjustment_history[i + 1]
+                    if low <= adj['new_weight'] < high:
+                        # Finde Trades in dieser Periode
+                        period_trades.extend(self._get_trades_in_period(
+                            adj['timestamp'], 
+                            next_adj['timestamp'],
+                            adj['new_weight']
+                        ))
+            
+            if period_trades:
+                wins = sum(1 for t in period_trades if t['is_win'])
+                total = len(period_trades)
+                results[range_name] = {
+                    'weight_range': f"{low:.2f}-{high:.2f}",
+                    'trades': total,
+                    'win_rate': wins / total if total > 0 else 0,
+                    'avg_result': (
+                        sum(t['result_pips'] for t in period_trades) / total 
+                        if total > 0 else 0
+                    )
+                }
+        
+        return results
+    
+    def _get_trades_in_period(self, start_time, end_time, weight):
+        """Hilfsfunktion für get_performance_by_weight_range"""
+        # Diese Funktion müsste mit deiner Trade-History integriert werden
+        return []  # Placeholder
+    
+    def get_adjustment_summary(self) -> Dict:
+        """Gibt Zusammenfassung der Anpassungen zurück"""
+        if not self.adjustment_history:
+            return {'adjustments': 0, 'message': 'No adjustments made yet'}
+        
+        total_adjustments = len(self.adjustment_history)
+        recent_adjustments = self.adjustment_history[-5:] if total_adjustments >= 5 else self.adjustment_history
+        
+        net_change = sum(adj['change'] for adj in self.adjustment_history)
+        
+        return {
+            'total_adjustments': total_adjustments,
+            'current_ml_weight': self.ml_weight,
+            'current_rules_weight': self.rules_weight,
+            'net_change_since_start': net_change,
+            'recent_adjustments': [
+                {
+                    'timestamp': adj['timestamp'].isoformat(),
+                    'from': adj['old_weight'],
+                    'to': adj['new_weight'],
+                    'reason': adj['reason']
+                }
+                for adj in recent_adjustments
+            ],
+            'weight_boundaries': {
+                'min': self.min_ml_weight,
+                'max': self.max_ml_weight,
+                'current_position': (self.ml_weight - self.min_ml_weight) / (self.max_ml_weight - self.min_ml_weight)
+            }
+        }
+    
+    def reset_to_default(self, reason: str = "Manual reset"):
+        """Setzt Gewichtung auf Standard zurück"""
+        default_weight = 0.7
+        self.set_ml_weight(default_weight, reason)
+        logger.info(f"Weights reset to default: ML={default_weight:.2f}")

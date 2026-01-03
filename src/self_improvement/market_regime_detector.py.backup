@@ -1,0 +1,366 @@
+"""
+Marktregime Detektor für adaptive Strategie-Anpassung
+"""
+
+import numpy as np
+import pandas as pd
+from typing import List, Dict, Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+class MarketRegimeDetector:
+    """
+    Erkennt Marktregime basierend auf Preis-Aktion und Volatilität
+    """
+    
+    def __init__(self, 
+                 atr_period: int = 14,
+                 trend_strength_period: int = 20,
+                 volatility_threshold: float = 1.5):
+        """
+        Initialisiert den Marktregime Detektor
+        
+        Args:
+            atr_period: Periode für Average True Range
+            trend_strength_period: Periode für Trend-Stärke Berechnung
+            volatility_threshold: Multiplikator für hohe Volatilität
+        """
+        self.atr_period = atr_period
+        self.trend_strength_period = trend_strength_period
+        self.volatility_threshold = volatility_threshold
+        
+        # Regime History
+        self.regime_history = []
+        
+        # Statistische Baselines
+        self.volatility_baseline = None
+        self.price_change_baseline = None
+        
+        logger.info("Market Regime Detector initialisiert")
+    
+    def detect_regime(self, candles: pd.DataFrame) -> Dict:
+        """
+        Erkennt aktuelles Marktregime
+        
+        Args:
+            candles: DataFrame mit OHLC Daten
+            
+        Returns:
+            Dictionary mit Regime-Informationen
+        """
+        if len(candles) < max(self.atr_period, self.trend_strength_period) * 2:
+            return {
+                'regime': 'UNKNOWN',
+                'confidence': 0.0,
+                'reason': 'Insufficient data',
+                'metrics': {}
+            }
+        
+        # Berechne Metriken
+        metrics = self._calculate_metrics(candles)
+        
+        # Bestimme Regime
+        regime, confidence, reason = self._determine_regime(metrics)
+        
+        result = {
+            'regime': regime,
+            'confidence': confidence,
+            'reason': reason,
+            'metrics': metrics,
+            'timestamp': pd.Timestamp.now()
+        }
+        
+        # Zu History hinzufügen
+        self.regime_history.append(result)
+        
+        # Baselines aktualisieren
+        self._update_baselines(metrics)
+        
+        logger.debug(f"Marktregime erkannt: {regime} (Confidence: {confidence:.2f})")
+        return result
+    
+    def _calculate_metrics(self, candles: pd.DataFrame) -> Dict:
+        """Berechnet alle relevanten Metriken"""
+        # Volatilität
+        atr = self._calculate_atr(candles)
+        recent_atr = atr.iloc[-1]
+        
+        # Trend-Stärke
+        trend_strength = self._calculate_trend_strength(candles)
+        
+        # Preis-Action Charakteristiken
+        price_metrics = self._calculate_price_metrics(candles)
+        
+        # Volumen (falls verfügbar)
+        volume_metrics = self._calculate_volume_metrics(candles) if 'volume' in candles.columns else {}
+        
+        return {
+            'atr': recent_atr,
+            'atr_percent': (recent_atr / candles['close'].iloc[-1]) * 100,
+            'trend_strength': trend_strength,
+            **price_metrics,
+            **volume_metrics
+        }
+    
+    def _calculate_atr(self, candles: pd.DataFrame) -> pd.Series:
+        """Berechnet Average True Range"""
+        high = candles['high']
+        low = candles['low']
+        close = candles['close']
+        
+        tr1 = high - low
+        tr2 = abs(high - close.shift())
+        tr3 = abs(low - close.shift())
+        
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = tr.rolling(window=self.atr_period).mean()
+        
+        return atr
+    
+    def _calculate_trend_strength(self, candles: pd.DataFrame) -> float:
+        """Berechnet Trend-Stärke als R² einer linearen Regression"""
+        if len(candles) < self.trend_strength_period:
+            return 0.0
+        
+        recent_prices = candles['close'].iloc[-self.trend_strength_period:].values
+        
+        # Lineare Regression
+        x = np.arange(len(recent_prices))
+        y = recent_prices
+        
+        # R² Berechnung
+        correlation_matrix = np.corrcoef(x, y)
+        r_squared = correlation_matrix[0, 1] ** 2
+        
+        return abs(r_squared)  # Absolute Wert da Richtung egal
+    
+    def _calculate_price_metrics(self, candles: pd.DataFrame) -> Dict:
+        """Berechnet Preis-basierte Metriken"""
+        close = candles['close']
+        
+        # Returns
+        returns = close.pct_change().dropna()
+        
+        # Autocorrelation (Mean-Reversion Indikator)
+        if len(returns) >= 10:
+            autocorr = returns.autocorr(lag=1)
+        else:
+            autocorr = 0.0
+        
+        # Range vs Body Ratio
+        high_low_range = candles['high'] - candles['low']
+        open_close_range = abs(candles['close'] - candles['open'])
+        range_ratio = (open_close_range / high_low_range).replace([np.inf, -np.inf], np.nan).mean()
+        
+        # Directional Movement
+        up_moves = (candles['high'] - candles['high'].shift(1)).clip(lower=0)
+        down_moves = (candles['low'].shift(1) - candles['low']).clip(lower=0)
+        
+        return {
+            'volatility_std': returns.std() * 100,  # in Prozent
+            'autocorrelation': autocorr,
+            'range_ratio': range_ratio,
+            'up_moves_avg': up_moves.mean(),
+            'down_moves_avg': down_moves.mean(),
+            'direction_ratio': up_moves.sum() / (up_moves.sum() + down_moves.sum()) if (up_moves.sum() + down_moves.sum()) > 0 else 0.5
+        }
+    
+    def _calculate_volume_metrics(self, candles: pd.DataFrame) -> Dict:
+        """Berechnet Volumen-Metriken"""
+        volume = candles['volume']
+        
+        if len(volume) < 10:
+            return {}
+        
+        volume_sma = volume.rolling(window=20).mean()
+        recent_volume_ratio = volume.iloc[-1] / volume_sma.iloc[-1] if volume_sma.iloc[-1] > 0 else 1.0
+        
+        # Volume-Price Correlation
+        price_changes = candles['close'].pct_change()
+        volume_changes = volume.pct_change()
+        
+        if len(price_changes) > 10 and len(volume_changes) > 10:
+            corr = price_changes.corr(volume_changes)
+        else:
+            corr = 0.0
+        
+        return {
+            'volume_ratio': recent_volume_ratio,
+            'volume_price_correlation': corr
+        }
+    
+    def _determine_regime(self, metrics: Dict) -> tuple:
+        """Bestimmt das Marktregime basierend auf Metriken"""
+        atr_percent = metrics.get('atr_percent', 0)
+        trend_strength = metrics.get('trend_strength', 0)
+        volatility_std = metrics.get('volatility_std', 0)
+        autocorrelation = metrics.get('autocorrelation', 0)
+        
+        # Hohe Volatilität erkennen
+        is_high_vol = False
+        if self.volatility_baseline:
+            vol_ratio = volatility_std / self.volatility_baseline
+            is_high_vol = vol_ratio > self.volatility_threshold
+        else:
+            is_high_vol = volatility_std > 0.5  # 0.5% tägliche Volatilität
+        
+        # Regime-Logik
+        if is_high_vol:
+            return 'HIGH_VOLATILITY', 0.8, f"High volatility detected: {volatility_std:.2f}%"
+        
+        elif trend_strength > 0.3:
+            # Trendrichtung bestimmen
+            direction_ratio = metrics.get('direction_ratio', 0.5)
+            if direction_ratio > 0.6:
+                return 'STRONG_UPTREND', 0.7, f"Strong uptrend (R²={trend_strength:.2f})"
+            elif direction_ratio < 0.4:
+                return 'STRONG_DOWNTREND', 0.7, f"Strong downtrend (R²={trend_strength:.2f})"
+            else:
+                return 'TRENDING', 0.6, f"Trending market (R²={trend_strength:.2f})"
+        
+        elif autocorrelation < -0.3:
+            return 'MEAN_REVERTING', 0.65, f"Mean-reverting pattern (autocorr={autocorrelation:.2f})"
+        
+        elif abs(autocorrelation) < 0.2 and trend_strength < 0.2:
+            return 'RANGING', 0.7, f"Ranging market (low trend strength: {trend_strength:.2f})"
+        
+        else:
+            return 'NEUTRAL', 0.5, "No clear regime detected"
+    
+    def _update_baselines(self, metrics: Dict):
+        """Aktualisiert statistische Baselines"""
+        volatility_std = metrics.get('volatility_std', 0)
+        
+        if self.volatility_baseline is None:
+            self.volatility_baseline = volatility_std
+        else:
+            # Exponentieller gleitender Durchschnitt
+            alpha = 0.1
+            self.volatility_baseline = alpha * volatility_std + (1 - alpha) * self.volatility_baseline
+    
+    def get_regime_history(self, n_last: int = 20) -> List[Dict]:
+        """Gibt letzte Regime-Erkennungen zurück"""
+        return self.regime_history[-n_last:] if self.regime_history else []
+    
+    def get_regime_statistics(self) -> Dict:
+        """Gibt Statistik über erkannte Regimes zurück"""
+        if not self.regime_history:
+            return {'total_samples': 0, 'message': 'No regime data available'}
+        
+        regimes = [r['regime'] for r in self.regime_history]
+        unique_regimes = set(regimes)
+        
+        stats = {
+            'total_samples': len(regimes),
+            'regime_distribution': {},
+            'most_common_regime': max(set(regimes), key=regimes.count) if regimes else 'UNKNOWN',
+            'regime_stability': self._calculate_regime_stability()
+        }
+        
+        for regime in unique_regimes:
+            count = regimes.count(regime)
+            stats['regime_distribution'][regime] = {
+                'count': count,
+                'percentage': (count / len(regimes)) * 100
+            }
+        
+        return stats
+    
+    def _calculate_regime_stability(self) -> float:
+        """Berechnet wie stabil das Regime ist (wenige Wechsel = stabil)"""
+        if len(self.regime_history) < 2:
+            return 1.0
+        
+        regimes = [r['regime'] for r in self.regime_history]
+        changes = sum(1 for i in range(1, len(regimes)) if regimes[i] != regimes[i-1])
+        
+        # Je weniger Wechsel, desto stabiler (0-1)
+        stability = 1.0 - (changes / (len(regimes) - 1))
+        return max(0.0, min(1.0, stability))
+    
+    def get_trading_recommendations(self, current_regime: Dict) -> Dict:
+        """
+        Gibt Trading-Empfehlungen basierend auf Marktregime
+        
+        Args:
+            current_regime: Aktuelles Regime-Dictionary
+            
+        Returns:
+            Dictionary mit Empfehlungen
+        """
+        regime = current_regime.get('regime', 'UNKNOWN')
+        confidence = current_regime.get('confidence', 0.5)
+        
+        recommendations = {
+            'STRONG_UPTREND': {
+                'action': 'Look for BUY opportunities',
+                'stop_loss_pips': 20,
+                'take_profit_pips': 40,
+                'position_size_multiplier': 1.2,
+                'confidence': 0.7
+            },
+            'STRONG_DOWNTREND': {
+                'action': 'Look for SELL opportunities',
+                'stop_loss_pips': 20,
+                'take_profit_pips': 40,
+                'position_size_multiplier': 1.2,
+                'confidence': 0.7
+            },
+            'TRENDING': {
+                'action': 'Trade with trend direction',
+                'stop_loss_pips': 25,
+                'take_profit_pips': 35,
+                'position_size_multiplier': 1.0,
+                'confidence': 0.6
+            },
+            'RANGING': {
+                'action': 'Range-bound strategies (buy low, sell high)',
+                'stop_loss_pips': 15,
+                'take_profit_pips': 25,
+                'position_size_multiplier': 0.8,
+                'confidence': 0.65
+            },
+            'MEAN_REVERTING': {
+                'action': 'Fade extremes',
+                'stop_loss_pips': 30,
+                'take_profit_pips': 20,
+                'position_size_multiplier': 0.7,
+                'confidence': 0.6
+            },
+            'HIGH_VOLATILITY': {
+                'action': 'Reduce position sizes, widen stops',
+                'stop_loss_pips': 35,
+                'take_profit_pips': 50,
+                'position_size_multiplier': 0.5,
+                'confidence': 0.8
+            },
+            'NEUTRAL': {
+                'action': 'Conservative trading',
+                'stop_loss_pips': 20,
+                'take_profit_pips': 30,
+                'position_size_multiplier': 0.9,
+                'confidence': 0.5
+            },
+            'UNKNOWN': {
+                'action': 'Wait for clearer signals',
+                'stop_loss_pips': 25,
+                'take_profit_pips': 35,
+                'position_size_multiplier': 0.5,
+                'confidence': 0.3
+            }
+        }
+        
+        base_rec = recommendations.get(regime, recommendations['UNKNOWN'])
+        
+        # Adjust based on confidence
+        if confidence < 0.5:
+            base_rec['position_size_multiplier'] *= 0.7
+            base_rec['confidence'] *= 0.8
+        
+        return {
+            'regime': regime,
+            'regime_confidence': confidence,
+            **base_rec,
+            'timestamp': pd.Timestamp.now().isoformat()
+        }

@@ -1,0 +1,15 @@
+{
+  "initial_capital": 10000.0,
+  "final_capital": 10342.0,
+  "total_return_pct": 3.42,
+  "total_profit": 342.0,
+  "total_trades": 321,
+  "winning_trades": 164,
+  "losing_trades": 157,
+  "win_rate": 0.5109034267912772,
+  "avg_profit_per_trade": 1.0654205607476634,
+  "max_drawdown_pct": 0.1984126984126984,
+  "sharpe_ratio": 1.2335624874978892,
+  "equity_curve_length": 5986,
+  "trades_count": 321
+}

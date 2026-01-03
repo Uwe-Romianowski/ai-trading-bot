@@ -1,0 +1,361 @@
+"""
+Performance Tracker für selbstoptimierenden Trading Bot
+Trackt Trade-Performance und ermöglicht auto-adjustments
+"""
+
+import numpy as np
+import pandas as pd
+from datetime import datetime, timedelta
+import json
+import os
+from typing import Dict, List, Tuple, Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+class PerformanceTracker:
+    """
+    Trackt Trading-Performance und berechnet Metriken für Selbstoptimierung
+    """
+    
+    def __init__(self, max_history_days: int = 30, min_trades_for_analysis: int = 10):
+        """
+        Initialisiert den Performance Tracker
+        
+        Args:
+            max_history_days: Maximale Anzahl Tage für Performance-Analyse
+            min_trades_for_analysis: Minimale Trades für statistische Signifikanz
+        """
+        self.max_history_days = max_history_days
+        self.min_trades_for_analysis = min_trades_for_analysis
+        
+        # Trade-History
+        self.trade_history: List[Dict] = []
+        
+        # Performance-Metriken
+        self.metrics = {
+            'total_trades': 0,
+            'winning_trades': 0,
+            'losing_trades': 0,
+            'total_profit_pips': 0.0,
+            'total_loss_pips': 0.0,
+            'current_win_streak': 0,
+            'current_loss_streak': 0,
+            'max_win_streak': 0,
+            'max_loss_streak': 0,
+            'largest_win': 0.0,
+            'largest_loss': 0.0,
+        }
+        
+        # Rolling Windows
+        self.window_metrics = {
+            10: {'win_rate': 0.5, 'avg_win': 0.0, 'avg_loss': 0.0},
+            30: {'win_rate': 0.5, 'avg_win': 0.0, 'avg_loss': 0.0},
+            50: {'win_rate': 0.5, 'avg_win': 0.0, 'avg_loss': 0.0},
+        }
+        
+        # Confidence Tracking
+        self.confidence_history = []
+        
+        logger.info("Performance Tracker initialisiert")
+    
+    def record_trade(self, 
+                    symbol: str, 
+                    direction: str, 
+                    result_pips: float, 
+                    confidence: float,
+                    ml_weight: float,
+                    entry_price: float,
+                    exit_price: float,
+                    duration_minutes: int = None):
+        """
+        Zeichnet einen abgeschlossenen Trade auf
+        
+        Args:
+            symbol: Trading-Symbol (z.B. 'EURUSD')
+            direction: 'BUY' oder 'SELL'
+            result_pips: Ergebnis in Pips (positiv = Gewinn, negativ = Verlust)
+            confidence: ML-Confidence für diesen Trade (0-1)
+            ml_weight: ML-Gewichtung zum Zeitpunkt des Trades
+            entry_price: Einstiegspreis
+            exit_price: Ausstiegspreis
+            duration_minutes: Trade-Dauer in Minuten (optional)
+        """
+        trade_record = {
+            'timestamp': datetime.now(),
+            'symbol': symbol,
+            'direction': direction,
+            'result_pips': result_pips,
+            'confidence': confidence,
+            'ml_weight': ml_weight,
+            'entry_price': entry_price,
+            'exit_price': exit_price,
+            'duration_minutes': duration_minutes,
+            'is_win': result_pips > 0,
+            'is_loss': result_pips < 0,
+        }
+        
+        # Zu History hinzufügen
+        self.trade_history.append(trade_record)
+        
+        # Performance-Metriken aktualisieren
+        self._update_metrics(trade_record)
+        
+        # Rolling Windows aktualisieren
+        self._update_window_metrics()
+        
+        # Confidence History aktualisieren
+        self.confidence_history.append({
+            'timestamp': datetime.now(),
+            'confidence': confidence,
+            'was_correct': result_pips > 0
+        })
+        
+        # Alte Trades bereinigen (älter als max_history_days)
+        self._clean_old_trades()
+        
+        logger.debug(f"Trade aufgezeichnet: {symbol} {direction} - {result_pips:.1f} pips (Conf: {confidence:.2f})")
+    
+    def _update_metrics(self, trade_record: Dict):
+        """Aktualisiert die Performance-Metriken"""
+        result = trade_record['result_pips']
+        
+        self.metrics['total_trades'] += 1
+        
+        if result > 0:
+            self.metrics['winning_trades'] += 1
+            self.metrics['total_profit_pips'] += result
+            self.metrics['current_win_streak'] += 1
+            self.metrics['current_loss_streak'] = 0
+            self.metrics['max_win_streak'] = max(
+                self.metrics['max_win_streak'], 
+                self.metrics['current_win_streak']
+            )
+            self.metrics['largest_win'] = max(self.metrics['largest_win'], result)
+        elif result < 0:
+            self.metrics['losing_trades'] += 1
+            self.metrics['total_loss_pips'] += abs(result)
+            self.metrics['current_loss_streak'] += 1
+            self.metrics['current_win_streak'] = 0
+            self.metrics['max_loss_streak'] = max(
+                self.metrics['max_loss_streak'], 
+                self.metrics['current_loss_streak']
+            )
+            self.metrics['largest_loss'] = min(self.metrics['largest_loss'], result)
+    
+    def _update_window_metrics(self):
+        """Aktualisiert Rolling-Window Metriken"""
+        for window in self.window_metrics.keys():
+            if len(self.trade_history) >= window:
+                window_trades = self.trade_history[-window:]
+                wins = sum(1 for t in window_trades if t['is_win'])
+                losses = sum(1 for t in window_trades if t['is_loss'])
+                
+                win_trades = [t for t in window_trades if t['is_win']]
+                loss_trades = [t for t in window_trades if t['is_loss']]
+                
+                self.window_metrics[window]['win_rate'] = wins / window if window > 0 else 0.5
+                self.window_metrics[window]['avg_win'] = (
+                    np.mean([t['result_pips'] for t in win_trades]) 
+                    if win_trades else 0.0
+                )
+                self.window_metrics[window]['avg_loss'] = (
+                    np.mean([abs(t['result_pips']) for t in loss_trades]) 
+                    if loss_trades else 0.0
+                )
+    
+    def _clean_old_trades(self):
+        """Entfernt Trades, die älter als max_history_days sind"""
+        cutoff_date = datetime.now() - timedelta(days=self.max_history_days)
+        self.trade_history = [
+            t for t in self.trade_history 
+            if t['timestamp'] > cutoff_date
+        ]
+    
+    def get_performance_summary(self) -> Dict:
+        """
+        Gibt eine Zusammenfassung der Performance zurück
+        
+        Returns:
+            Dictionary mit allen Performance-Metriken
+        """
+        total_trades = self.metrics['total_trades']
+        if total_trades == 0:
+            return {'error': 'No trades recorded yet'}
+        
+        win_rate = (self.metrics['winning_trades'] / total_trades * 100) if total_trades > 0 else 0
+        avg_win = (self.metrics['total_profit_pips'] / self.metrics['winning_trades']) if self.metrics['winning_trades'] > 0 else 0
+        avg_loss = (self.metrics['total_loss_pips'] / self.metrics['losing_trades']) if self.metrics['losing_trades'] > 0 else 0
+        profit_factor = (self.metrics['total_profit_pips'] / self.metrics['total_loss_pips']) if self.metrics['total_loss_pips'] > 0 else float('inf')
+        
+        # Confidence Analysis
+        confidence_correct = 0
+        confidence_total = 0
+        for record in self.confidence_history[-100:]:  # Letzte 100 Trades
+            confidence_total += 1
+            if record['was_correct']:
+                confidence_correct += 1
+        
+        confidence_accuracy = (confidence_correct / confidence_total * 100) if confidence_total > 0 else 0
+        
+        return {
+            'overall': {
+                'total_trades': total_trades,
+                'winning_trades': self.metrics['winning_trades'],
+                'losing_trades': self.metrics['losing_trades'],
+                'win_rate_percent': round(win_rate, 2),
+                'total_profit_pips': round(self.metrics['total_profit_pips'], 2),
+                'total_loss_pips': round(self.metrics['total_loss_pips'], 2),
+                'net_profit_pips': round(self.metrics['total_profit_pips'] - self.metrics['total_loss_pips'], 2),
+                'avg_win_pips': round(avg_win, 2),
+                'avg_loss_pips': round(avg_loss, 2),
+                'profit_factor': round(profit_factor, 2),
+                'largest_win': round(self.metrics['largest_win'], 2),
+                'largest_loss': round(self.metrics['largest_loss'], 2),
+                'current_streak': self.metrics['current_win_streak'] if self.metrics['current_win_streak'] > 0 else -self.metrics['current_loss_streak'],
+                'max_win_streak': self.metrics['max_win_streak'],
+                'max_loss_streak': self.metrics['max_loss_streak'],
+            },
+            'rolling_windows': self.window_metrics,
+            'confidence_analysis': {
+                'accuracy_percent': round(confidence_accuracy, 2),
+                'samples': confidence_total,
+                'high_confidence_threshold': 0.7,
+                'low_confidence_threshold': 0.5,
+            },
+            'analysis_timestamp': datetime.now().isoformat(),
+        }
+    
+    def should_adjust_ml_weight(self, window_size: int = 30) -> Tuple[bool, str, float]:
+        """
+        Entscheidet, ob ML-Gewicht angepasst werden sollte
+        
+        Args:
+            window_size: Fenstergröße für Analyse
+            
+        Returns:
+            Tuple: (should_adjust, reason, suggested_weight_change)
+        """
+        if len(self.trade_history) < self.min_trades_for_analysis:
+            return False, "Not enough trades for analysis", 0.0
+        
+        # Hole aktuelle Window-Metriken
+        if window_size in self.window_metrics:
+            win_rate = self.window_metrics[window_size]['win_rate']
+        else:
+            # Fallback: Berechne aus letzten N Trades
+            recent_trades = self.trade_history[-window_size:] if len(self.trade_history) >= window_size else self.trade_history
+            wins = sum(1 for t in recent_trades if t['is_win'])
+            win_rate = wins / len(recent_trades) if recent_trades else 0.5
+        
+        # Entscheidungslogik
+        if win_rate < 0.45:  # Unterperformt
+            return True, f"Low win rate: {win_rate:.1%}", -0.15  # Reduziere ML-Weight
+        elif win_rate > 0.65:  # Überperformt
+            return True, f"High win rate: {win_rate:.1%}", 0.10  # Erhöhe ML-Weight
+        elif win_rate < 0.50:  # Leicht unterperformt
+            return True, f"Below average win rate: {win_rate:.1%}", -0.05  # Leichte Reduktion
+        else:
+            return False, f"Win rate within optimal range: {win_rate:.1%}", 0.0
+    
+    def get_confidence_analysis(self) -> Dict:
+        """
+        Analysiert die ML-Confidence Accuracy
+        
+        Returns:
+            Dictionary mit Confidence-Analyse
+        """
+        if not self.confidence_history:
+            return {'error': 'No confidence data available'}
+        
+        # Kategorisiere Confidence Levels
+        high_conf = [c for c in self.confidence_history if c['confidence'] >= 0.7]
+        med_conf = [c for c in self.confidence_history if 0.5 <= c['confidence'] < 0.7]
+        low_conf = [c for c in self.confidence_history if c['confidence'] < 0.5]
+        
+        def calculate_accuracy(records):
+            if not records:
+                return 0.0
+            correct = sum(1 for r in records if r['was_correct'])
+            return correct / len(records)
+        
+        return {
+            'high_confidence': {
+                'count': len(high_conf),
+                'accuracy': calculate_accuracy(high_conf),
+                'description': 'Confidence >= 70%'
+            },
+            'medium_confidence': {
+                'count': len(med_conf),
+                'accuracy': calculate_accuracy(med_conf),
+                'description': '50% <= Confidence < 70%'
+            },
+            'low_confidence': {
+                'count': len(low_conf),
+                'accuracy': calculate_accuracy(low_conf),
+                'description': 'Confidence < 50%'
+            },
+            'overall_accuracy': calculate_accuracy(self.confidence_history),
+            'recommendation': self._get_confidence_recommendation(high_conf, med_conf, low_conf)
+        }
+    
+    def _get_confidence_recommendation(self, high_conf, med_conf, low_conf):
+        """Generiert Empfehlung basierend auf Confidence-Analyse"""
+        if not high_conf:
+            return "Increase confidence threshold for trades"
+        
+        high_acc = sum(1 for c in high_conf if c['was_correct']) / len(high_conf) if high_conf else 0
+        med_acc = sum(1 for c in med_conf if c['was_correct']) / len(med_conf) if med_conf else 0
+        
+        if high_acc > 0.7 and len(high_conf) > 10:
+            return "High confidence trades are accurate - consider increasing position size for high confidence signals"
+        elif high_acc < 0.5:
+            return "High confidence trades underperforming - consider adjusting ML model or confidence calculation"
+        else:
+            return "Confidence levels performing as expected"
+    
+    def save_performance_report(self, filepath: str = "data/performance_report.json"):
+        """Speichert Performance-Report als JSON"""
+        report = {
+            'summary': self.get_performance_summary(),
+            'trade_history': [
+                {
+                    'timestamp': t['timestamp'].isoformat(),
+                    'symbol': t['symbol'],
+                    'result_pips': t['result_pips'],
+                    'confidence': t['confidence']
+                }
+                for t in self.trade_history[-100:]  # Letzte 100 Trades
+            ],
+            'confidence_analysis': self.get_confidence_analysis(),
+            'export_timestamp': datetime.now().isoformat()
+        }
+        
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, 'w') as f:
+            json.dump(report, f, indent=2)
+        
+        logger.info(f"Performance Report gespeichert: {filepath}")
+        return filepath
+    
+    def get_recommended_position_size(self, confidence: float, base_size: float = 0.01) -> float:
+        """
+        Berechnet empfohlene Positionsgröße basierend auf Confidence
+        
+        Args:
+            confidence: ML-Confidence (0-1)
+            base_size: Basis-Positionsgröße in Lots
+            
+        Returns:
+            Adjustierte Positionsgröße
+        """
+        if confidence >= 0.8:
+            return base_size * 1.5  # 50% größer bei hoher Confidence
+        elif confidence >= 0.7:
+            return base_size * 1.2  # 20% größer
+        elif confidence >= 0.6:
+            return base_size  # Standard
+        elif confidence >= 0.5:
+            return base_size * 0.7  # 30% kleiner
+        else:
+            return base_size * 0.5  # 50% kleiner oder Trade überspringen

@@ -1,0 +1,14 @@
+{
+  "features": [
+    "open", "high", "low", "close", "volume",
+    "sma_10", "sma_20", "sma_50", "ema_12", "ema_26",
+    "rsi", "stoch_k", "stoch_d", "macd", "macd_signal",
+    "bb_upper", "bb_middle", "bb_lower", "bb_width", "bb_position",
+    "atr", "adx", "cci", "obv", "volume_sma",
+    "returns_1", "returns_5", "returns_10", "volatility_10",
+    "high_low_ratio", "close_open_ratio", "volume_ratio",
+    "price_position", "trend_strength", "momentum",
+    "day_of_week", "hour_of_day", "is_london_open", "is_ny_open",
+    "spread", "spread_ratio"
+  ]
+}
