@@ -23,6 +23,7 @@ def test_env_config():
         load_dotenv(env_path)
         print("✅ .env Datei gefunden und geladen")
     else:
+        # Alternative suchen
         load_dotenv()
         if os.getenv('MT5_LOGIN'):
             print("✅ .env Datei geladen (anderer Pfad)")
@@ -33,6 +34,7 @@ def test_env_config():
     # Prüfe kritische Variablen
     print("\n📋 GELADENE KONFIGURATION:")
     
+    # Deine spezifischen Variablennamen
     variables = {
         'MT5_LOGIN': os.getenv('MT5_LOGIN'),
         'MT5_PASSWORD': '*** gesetzt ***' if os.getenv('MT5_PASSWORD') else 'NICHT GESETZT',

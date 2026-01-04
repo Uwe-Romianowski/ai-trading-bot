@@ -1,0 +1,58 @@
+{
+  "portfolio_id": "PORT_20260104_151452",
+  "generated_at": "2026-01-04T15:14:52.559270",
+  "summary": {
+    "portfolio_id": "PORT_20260104_151452",
+    "timestamp": "2026-01-04T15:14:52.559300",
+    "initial_balance": 10000.0,
+    "current_balance": 10082.62,
+    "equity": 10082.62,
+    "unrealized_pnl": 0.0,
+    "open_positions": 0,
+    "total_trades": 1,
+    "peak_equity": 10082.62,
+    "current_drawdown": 0.0,
+    "max_drawdown": 0.0,
+    "max_drawdown_percentage": 0.0,
+    "daily_pnl": {
+      "2026-01-04": 91.29999999999788
+    },
+    "performance_metrics": {
+      "total_trades": 1,
+      "winning_trades": 1,
+      "losing_trades": 0,
+      "win_rate": 100.0,
+      "total_pnl": 91.3,
+      "total_pnl_percentage": 0.91,
+      "avg_win": 91.3,
+      "avg_loss": 0.0,
+      "profit_factor": 0.0,
+      "max_drawdown": 0.0,
+      "max_drawdown_percentage": 0.0,
+      "sharpe_ratio": 0.0,
+      "expectancy": 91.3,
+      "best_trade": 91.3,
+      "worst_trade": 0.0,
+      "avg_trade_duration": "0:00:00"
+    }
+  },
+  "trade_history": [
+    {
+      "order_id": "ORD_20260104_151452_ea74",
+      "symbol": "EURUSD",
+      "type": "BUY",
+      "status": "CLOSED",
+      "entry_price": 1.085,
+      "quantity": 0.4,
+      "current_price": 1.0875,
+      "pnl": 91.29999999999788,
+      "pnl_percentage": 0.21036866359446516,
+      "confidence": 0.75,
+      "open_time": "2026-01-04 15:14:52.553154",
+      "close_time": "2026-01-04 15:14:52.555813",
+      "stop_loss": 1.08,
+      "take_profit": 1.09
+    }
+  ],
+  "open_positions": []
+}
