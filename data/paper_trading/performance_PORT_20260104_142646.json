@@ -1,0 +1,39 @@
+{
+  "portfolio_id": "PORT_20260104_142646",
+  "generated_at": "2026-01-04T14:34:25.915639",
+  "summary": {
+    "portfolio_id": "PORT_20260104_142646",
+    "timestamp": "2026-01-04T14:34:25.915696",
+    "initial_balance": 10000.0,
+    "current_balance": 10000.0,
+    "equity": 10000.0,
+    "unrealized_pnl": 0.0,
+    "open_positions": 0,
+    "total_trades": 0,
+    "peak_equity": 10000.0,
+    "current_drawdown": 0.0,
+    "max_drawdown": 0.0,
+    "max_drawdown_percentage": 0.0,
+    "daily_pnl": {},
+    "performance_metrics": {
+      "total_trades": 0,
+      "winning_trades": 0,
+      "losing_trades": 0,
+      "win_rate": 0.0,
+      "total_pnl": 0.0,
+      "total_pnl_percentage": 0.0,
+      "avg_win": 0.0,
+      "avg_loss": 0.0,
+      "profit_factor": 0.0,
+      "max_drawdown": 0.0,
+      "max_drawdown_percentage": 0.0,
+      "sharpe_ratio": 0.0,
+      "expectancy": 0.0,
+      "best_trade": 0.0,
+      "worst_trade": 0.0,
+      "avg_trade_duration": "0:00:00"
+    }
+  },
+  "trade_history": [],
+  "open_positions": []
+}
