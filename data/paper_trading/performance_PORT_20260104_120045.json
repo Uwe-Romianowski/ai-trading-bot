@@ -1,0 +1,74 @@
+{
+  "portfolio_id": "PORT_20260104_120045",
+  "generated_at": "2026-01-04T12:00:45.774734",
+  "summary": {
+    "portfolio_id": "PORT_20260104_120045",
+    "timestamp": "2026-01-04T12:00:45.774782",
+    "initial_balance": 10000.0,
+    "current_balance": 10155.07,
+    "equity": 10155.07,
+    "unrealized_pnl": 0.0,
+    "open_positions": 0,
+    "total_trades": 2,
+    "peak_equity": 10155.07,
+    "current_drawdown": 0.0,
+    "max_drawdown": 9.94,
+    "max_drawdown_percentage": 0.1,
+    "daily_pnl": {
+      "2026-01-04": 165.01000000000406
+    },
+    "performance_metrics": {
+      "total_trades": 2,
+      "winning_trades": 1,
+      "losing_trades": 1,
+      "win_rate": 50.0,
+      "total_pnl": 165.01,
+      "total_pnl_percentage": 1.65,
+      "avg_win": 191.28,
+      "avg_loss": -26.27,
+      "profit_factor": 7.28,
+      "max_drawdown": 0.0,
+      "max_drawdown_percentage": 0.0,
+      "sharpe_ratio": 0.0,
+      "expectancy": 82.51,
+      "best_trade": 191.28,
+      "worst_trade": -26.27,
+      "avg_trade_duration": "0:00:00"
+    }
+  },
+  "trade_history": [
+    {
+      "order_id": "ORD_20260104_120045_6e9f",
+      "symbol": "EURUSD",
+      "type": "BUY",
+      "status": "CLOSED",
+      "entry_price": 1.085,
+      "quantity": 0.4,
+      "current_price": 1.09,
+      "pnl": 191.28000000000463,
+      "pnl_percentage": 0.44073732718895076,
+      "confidence": 0.72,
+      "open_time": "2026-01-04 12:00:45.749209",
+      "close_time": "2026-01-04 12:00:45.757143",
+      "stop_loss": 1.08,
+      "take_profit": 1.095
+    },
+    {
+      "order_id": "ORD_20260104_120045_2201",
+      "symbol": "GBPUSD",
+      "type": "SELL",
+      "status": "CLOSED",
+      "entry_price": 1.265,
+      "quantity": 0.05,
+      "current_price": 1.27,
+      "pnl": -26.27000000000058,
+      "pnl_percentage": -0.4153359683794558,
+      "confidence": 0.65,
+      "open_time": "2026-01-04 12:00:45.751943",
+      "close_time": "2026-01-04 12:00:45.759865",
+      "stop_loss": null,
+      "take_profit": null
+    }
+  ],
+  "open_positions": []
+}
