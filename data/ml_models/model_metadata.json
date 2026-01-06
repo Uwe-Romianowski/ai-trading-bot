@@ -1,0 +1,29 @@
+{
+  "training_date": "2026-01-06T11:43:49.129889",
+  "symbol": "EURUSD",
+  "timeframe": "H1",
+  "bars_used": 10000,
+  "future_bars": 3,
+  "accuracy": 0.6034712950600801,
+  "auc": 0.6537561198418476,
+  "train_samples": 2996,
+  "test_samples": 749,
+  "features": 36,
+  "buy_signals": 1932,
+  "sell_signals": 1813,
+  "total_signals": 3745,
+  "model_type": "enhanced_random_forest",
+  "parameters": {
+    "n_estimators": 200,
+    "max_depth": 15,
+    "min_samples_split": 10,
+    "min_samples_leaf": 5,
+    "class_weight": "{np.int64(0): np.float64(1.033103448275862), np.int64(1): np.float64(0.9689521345407504)}"
+  },
+  "performance": {
+    "train_accuracy": 0.9849799732977303,
+    "test_accuracy": 0.6034712950600801,
+    "auc_roc": 0.6537561198418476,
+    "training_time_seconds": 1.7196180820465088
+  }
+}

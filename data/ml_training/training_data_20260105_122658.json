@@ -1,0 +1,70 @@
+{
+  "signal_history": [
+    {
+      "timestamp": "2026-01-05T12:26:40.785137",
+      "symbol": "EURUSD",
+      "signal": "HOLD",
+      "confidence": 46.65159467284495,
+      "hour": 12,
+      "minute": 26,
+      "day_of_week": 0,
+      "weights": [
+        0.35,
+        0.35,
+        0.3
+      ]
+    },
+    {
+      "timestamp": "2026-01-05T12:26:49.811549",
+      "symbol": "EURUSD",
+      "signal": "BUY",
+      "confidence": 74.63220970137743,
+      "hour": 12,
+      "minute": 26,
+      "day_of_week": 0,
+      "weights": [
+        0.35,
+        0.35,
+        0.3
+      ]
+    },
+    {
+      "timestamp": "2026-01-05T12:26:57.723346",
+      "symbol": "EURUSD",
+      "signal": "HOLD",
+      "confidence": 52.827613913040274,
+      "hour": 12,
+      "minute": 26,
+      "day_of_week": 0,
+      "weights": [
+        0.35,
+        0.35,
+        0.3
+      ]
+    }
+  ],
+  "performance_stats": {
+    "total_signals": 3,
+    "correct_signals": 0,
+    "incorrect_signals": 0,
+    "total_return": 0.0
+  },
+  "portfolio_stats": {
+    "portfolio_id": "portfolio_20260105_122640",
+    "initial_balance": 997.24,
+    "current_balance": 997.24,
+    "total_pnl": 0.0,
+    "total_pnl_percent": 0.0,
+    "trade_count": 1,
+    "winning_trades": 0,
+    "losing_trades": 0,
+    "win_rate": 0.0,
+    "avg_win": 0.0,
+    "avg_loss": 0.0,
+    "profit_factor": Infinity,
+    "max_drawdown": 0.0,
+    "open_positions": 1,
+    "closed_positions": 0
+  },
+  "saved_at": "2026-01-05T12:26:58.125984"
+}
