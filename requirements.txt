@@ -1,24 +1,26 @@
-# AI Trading Bot Requirements
+# ============================================================================
+# AI TRADING BOT v4.2 - Requirements
+# ============================================================================
+# Install with: pip install -r requirements.txt
+# ============================================================================
 
-# Core
-numpy>=1.21.0
-pandas>=1.5.0
-scikit-learn>=1.0.0
-scipy>=1.7.0
+# CORE (konkrete Versionen für Stabilität)
+pandas==2.2.3
+numpy==2.2.6
+scikit-learn==1.7.2
+joblib==1.4.3
+MetaTrader5==5.0.5388
 
-# Trading
-MetaTrader5>=5.0.43
-ta>=0.10.0
+# UTILITIES (wichtig für ML und Trading)
+python-dateutil==2.9.0
+pytz==2025.2
+TA-Lib==0.4.28
 
-# Utilities
-pyyaml>=6.0
-colorama>=0.4.5
-joblib>=1.1.0
+# OPTIONAL (für erweiterte Features)
+matplotlib==3.10.7        # Für Visualisierungen
+python-dotenv==1.0.0      # Für Umgebungsvariablen
+psutil==5.9.8             # Für System-Überwachung
 
-# Development
-pytest>=7.0.0
-
-# Phase D Optimierungen
-python-dotenv
-python-gitignore
-colorama
+# DEVELOPMENT
+# tensorflow==2.15.0      # Für Deep Learning (deaktiviert)
+# yfinance==0.2.38        # Für Yahoo Finance Daten (deaktiviert)

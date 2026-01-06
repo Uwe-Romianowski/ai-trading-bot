@@ -1,0 +1,51 @@
+{
+  "version": "4.2.0",
+  "trading": {
+    "symbol": "EURUSD",
+    "timeframe": "H1",
+    "max_open_trades": 3,
+    "risk_per_trade": 0.02,
+    "default_lot_size": 0.01,
+    "stop_loss_pips": 30,
+    "take_profit_pips": 60,
+    "max_daily_trades": 10,
+    "trading_hours": {
+      "start": 8,
+      "end": 17
+    }
+  },
+  "ml": {
+    "enabled": true,
+    "model_type": "enhanced",
+    "min_confidence": 65,
+    "retrain_interval_days": 7,
+    "use_technical_indicators": true,
+    "feature_count": 12
+  },
+  "paper_trading": {
+    "enabled": true,
+    "initial_balance": 10000.0,
+    "commission_per_trade": 0.0,
+    "spread_pips": 2.0,
+    "simulate_slippage": true
+  },
+  "risk_management": {
+    "max_drawdown_percent": 20,
+    "max_daily_loss": 500,
+    "trailing_stop_enabled": false,
+    "hedging_allowed": false,
+    "news_filter_enabled": true
+  },
+  "ui": {
+    "refresh_rate_seconds": 5,
+    "show_live_prices": true,
+    "color_scheme": "default",
+    "log_level": "INFO"
+  },
+  "performance": {
+    "tracking_enabled": true,
+    "save_trade_history": true,
+    "generate_reports": true,
+    "backtesting_enabled": false
+  }
+}

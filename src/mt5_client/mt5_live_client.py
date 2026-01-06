@@ -1,160 +1,252 @@
 # src/mt5_client/mt5_live_client.py - KORRIGIERTE VERSION
+
 import MetaTrader5 as mt5
 import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
+import time
+from typing import Optional, Dict, List
+import os
+from dotenv import load_dotenv
 
 class MT5LiveClient:
-    """MT5 Live Data Client für den AI Trading Bot"""
-    
-    def __init__(self, login=REMOVED_MT5_LOGIN, server="REMOVED_MT5_SERVER", password=None):
-        self.login = login
-        self.server = server
-        self.password = password
-        self.connected = False
+    """
+    Einfacher MT5 Client für Live-Trading mit korrekter .env Integration.
+    """
+    def __init__(self, login=None, server=None, password=None):  # KEINE festen Werte mehr!
+        """
+        Initialisiert den MT5 Client.
         
-    def connect(self):
-        """Stellt Verbindung zu MT5 her"""
-        print(f"\n📡 Verbinde mit MT5 Demo Account {self.login}...")
+        Args:
+            login: MT5 Kontonummer (wird aus MT5_LOGIN in .env geladen wenn None)
+            server: MT5 Server (wird aus MT5_SERVER in .env geladen wenn None)
+            password: MT5 Passwort (wird aus MT5_PASSWORD in .env geladen wenn None)
+        """
+        # .env Datei laden
+        load_dotenv()
+        
+        # Werte aus .env laden falls nicht explizit angegeben
+        self.login = login or os.getenv('MT5_LOGIN')
+        self.server = server or os.getenv('MT5_SERVER', 'REMOVED_MT5_SERVER')
+        self.password = password or os.getenv('MT5_PASSWORD')
+        
+        self.connected = False
+        self.account_info = None
+        
+    def connect(self) -> bool:
+        """
+        Stellt Verbindung zum MT5 Server her.
+        
+        Returns:
+            bool: True wenn Verbindung erfolgreich
+        """
+        print(f"\n📡 Verbinde mit MT5 Demo Account...")
+        
+        if not mt5.initialize():
+            print("❌ MT5 konnte nicht initialisiert werden")
+            return False
         
         try:
-            # Initialize MT5
-            if not mt5.initialize():
-                error = mt5.last_error()
-                print(f"❌ MT5 Initialize failed: {error}")
-                return False
-            
             # Login versuchen
             if self.password:
-                authorized = mt5.login(self.login, password=self.password, server=self.server)
+                authorized = mt5.login(int(self.login) if self.login else None, 
+                                      password=self.password, 
+                                      server=self.server)
             else:
-                authorized = mt5.login(self.login, server=self.server)
+                authorized = mt5.login(int(self.login) if self.login else None, 
+                                      server=self.server)
+            
+            if authorized:
+                self.connected = True
                 
-            if not authorized:
-                print(f"⚠️  Login ohne Passwort fehlgeschlagen")
-                # Trotzdem connected setzen falls initialize erfolgreich
-                
-            # Account Info
-            try:
+                # Account Info holen
                 account_info = mt5.account_info()
                 if account_info:
-                    print(f"✅ MT5 verbunden")
+                    self.account_info = account_info._asdict()
+                    print(f"✅ Erfolgreich verbunden mit MT5 Account")
                     print(f"   • Account: {account_info.login}")
                     print(f"   • Balance: ${account_info.balance:.2f}")
-            except:
-                print("⚠️  Keine Account Info verfügbar")
-            
-            self.connected = True
-            return True
-            
+                    print(f"   • Server: {self.server}")
+                else:
+                    print("⚠️  Verbunden, aber keine Account Info verfügbar")
+                
+                return True
+            else:
+                print(f"❌ Login fehlgeschlagen")
+                error = mt5.last_error()
+                print(f"   Error Code: {error[0]}, Description: {error[1]}")
+                return False
+                
         except Exception as e:
             print(f"❌ Verbindungsfehler: {e}")
             return False
     
-    def disconnect(self):
-        """Trennt MT5 Verbindung"""
+    def disconnect(self) -> None:
+        """Trennt die Verbindung zum MT5 Server."""
         if self.connected:
             mt5.shutdown()
             self.connected = False
             print("✅ MT5 Verbindung getrennt")
     
-    def get_historical_data(self, symbol="EURUSD", timeframe="M5", count=100):
-        """Holt historische Daten - ML-KOMPATIBEL"""
-        if not self.connected:
-            print("❌ Nicht verbunden")
-            return pd.DataFrame()
+    def get_live_price(self, symbol: str = "EURUSD") -> Optional[Dict]:
+        """
+        Holt den aktuellen Preis für ein Symbol.
         
-        # Zeitframe Mapping
+        Args:
+            symbol: Trading Symbol (z.B. "EURUSD")
+            
+        Returns:
+            Dict mit Bid/Ask oder None bei Fehler
+        """
+        if not self.connected:
+            if not self.connect():
+                return None
+        
+        try:
+            tick = mt5.symbol_info_tick(symbol)
+            if tick:
+                return {
+                    'symbol': symbol,
+                    'bid': tick.bid,
+                    'ask': tick.ask,
+                    'time': pd.to_datetime(tick.time, unit='s'),
+                    'spread': (tick.ask - tick.bid) * 10000  # In Pips
+                }
+        except Exception as e:
+            print(f"❌ Fehler beim Preisabruf: {e}")
+        
+        return None
+    
+    def get_historical_data(self, symbol: str, timeframe: str, count: int = 100) -> Optional[pd.DataFrame]:
+        """
+        Holt historische Daten von MT5.
+        
+        Args:
+            symbol: Trading Symbol
+            timeframe: Zeitrahmen (M1, M5, H1, etc.)
+            count: Anzahl der Kerzen
+            
+        Returns:
+            DataFrame mit OHLC Daten oder None
+        """
+        if not self.connected:
+            if not self.connect():
+                return None
+        
+        # Zeitrahmen Mapping
         tf_map = {
             'M1': mt5.TIMEFRAME_M1,
             'M5': mt5.TIMEFRAME_M5,
             'M15': mt5.TIMEFRAME_M15,
+            'M30': mt5.TIMEFRAME_M30,
             'H1': mt5.TIMEFRAME_H1,
             'H4': mt5.TIMEFRAME_H4,
-            'D1': mt5.TIMEFRAME_D1
+            'D1': mt5.TIMEFRAME_D1,
+            'W1': mt5.TIMEFRAME_W1,
         }
         
         mt5_tf = tf_map.get(timeframe, mt5.TIMEFRAME_M5)
         
         try:
-            # Daten abrufen
             rates = mt5.copy_rates_from_pos(symbol, mt5_tf, 0, count)
-            
-            if rates is None or len(rates) == 0:
-                print(f"❌ Keine Daten für {symbol}")
-                return pd.DataFrame()
-            
-            # In DataFrame konvertieren
-            df = pd.DataFrame(rates)
-            
-            # Zeitstempel konvertieren
-            df['time'] = pd.to_datetime(df['time'], unit='s')
-            
-            # ML-kompatibles Format erstellen
-            ml_df = pd.DataFrame()
-            ml_df['time'] = df['time']
-            ml_df['open'] = df['open'].astype(float)
-            ml_df['high'] = df['high'].astype(float)
-            ml_df['low'] = df['low'].astype(float)
-            ml_df['close'] = df['close'].astype(float)
-            
-            # Volume extrahieren
-            if 'tick_volume' in df.columns:
-                ml_df['volume'] = df['tick_volume'].astype(int)
-            elif 'volume' in df.columns:
-                ml_df['volume'] = df['volume'].astype(int)
-            else:
-                ml_df['volume'] = 1000
-            
-            print(f"✅ {len(ml_df)} {symbol} {timeframe} Kerzen geladen")
-            print(f"   Zeitraum: {ml_df['time'].iloc[0].strftime('%Y-%m-%d %H:%M')} bis {ml_df['time'].iloc[-1].strftime('%Y-%m-%d %H:%M')}")
-            print(f"   Close: {ml_df['close'].iloc[-1]:.5f}")
-            
-            return ml_df
-            
+            if rates is not None and len(rates) > 0:
+                df = pd.DataFrame(rates)
+                df['time'] = pd.to_datetime(df['time'], unit='s')
+                df.set_index('time', inplace=True)
+                df.columns = ['open', 'high', 'low', 'close', 'tick_volume', 'spread', 'real_volume']
+                return df
         except Exception as e:
-            print(f"❌ Fehler beim Laden: {e}")
-            return pd.DataFrame()
-    
-    def test_connection(self):
-        """Testet die Verbindung"""
-        print("\n" + "="*60)
-        print("🧪 MT5 VERBINDUNGSTEST")
-        print("="*60)
+            print(f"❌ Fehler beim Datenabruf: {e}")
         
-        if not self.connect():
-            return False
+        return None
+    
+    def get_account_summary(self) -> Dict:
+        """
+        Gibt eine Zusammenfassung des Accounts zurück.
+        
+        Returns:
+            Dict mit Account Informationen
+        """
+        if not self.connected:
+            self.connect()
+        
+        summary = {
+            'connected': self.connected,
+            'login': self.login,
+            'server': self.server,
+            'account_info': self.account_info
+        }
+        
+        if self.account_info:
+            # Wichtige Metriken berechnen
+            balance = self.account_info.get('balance', 0)
+            equity = self.account_info.get('equity', 0)
+            margin = self.account_info.get('margin', 0)
+            free_margin = self.account_info.get('margin_free', 0)
+            
+            summary.update({
+                'balance': balance,
+                'equity': equity,
+                'margin': margin,
+                'free_margin': free_margin,
+                'margin_level': (equity / margin * 100) if margin > 0 else 0,
+                'pl': equity - balance,
+                'free_margin_percent': (free_margin / equity * 100) if equity > 0 else 0
+            })
+        
+        return summary
+    
+    def is_market_open(self, symbol: str = "EURUSD") -> bool:
+        """
+        Prüft ob der Markt für ein Symbol geöffnet ist.
+        
+        Args:
+            symbol: Trading Symbol
+            
+        Returns:
+            bool: True wenn Markt geöffnet
+        """
+        if not self.connected:
+            if not self.connect():
+                return False
         
         try:
-            # Teste Datenabruf
-            print(f"\n📈 Teste Datenabruf EURUSD M5:")
-            df = self.get_historical_data("EURUSD", "M5", 20)
-            
-            if not df.empty:
-                print(f"   ✅ {len(df)} Kerzen empfangen")
-                print(f"   📊 Letzte Kerze:")
-                last = df.iloc[-1]
-                print(f"      • Time: {last['time'].strftime('%Y-%m-%d %H:%M')}")
-                print(f"      • Close: {last['close']:.5f}")
-                print(f"      • Volume: {last['volume']}")
-                
-                print("\n" + "="*60)
-                print("✅ MT5 TEST ERFOLGREICH")
-                print("="*60)
-                return True
-            else:
-                print(f"   ❌ Keine Daten")
-                return False
-                
-        finally:
-            self.disconnect()
+            info = mt5.symbol_info(symbol)
+            if info:
+                return info.visible and info.trade_mode == 0  # 0 = TRADE_MODE_FULL
+        except:
+            pass
+        
+        return False
 
-# Einfache Testfunktion
+
 def test_mt5_client():
-    """Testet den MT5 Client"""
-    print("🧪 Starte MT5 Test...")
+    """Testet die MT5 Verbindung."""
+    print("\n🧪 TESTE MT5 CLIENT...")
+    
     client = MT5LiveClient()
-    return client.test_connection()
+    
+    if client.connect():
+        print("\n✅ Verbindung erfolgreich!")
+        
+        # Account Zusammenfassung
+        summary = client.get_account_summary()
+        print(f"\n📊 ACCOUNT ZUSAMMENFASSUNG:")
+        for key, value in summary.items():
+            if key not in ['account_info', 'connected']:
+                print(f"   {key}: {value}")
+        
+        # Live Preis
+        price = client.get_live_price("EURUSD")
+        if price:
+            print(f"\n💱 LIVE PREIS EURUSD:")
+            print(f"   Bid: {price['bid']:.5f}")
+            print(f"   Ask: {price['ask']:.5f}")
+            print(f"   Spread: {price['spread']:.1f} pips")
+        
+        client.disconnect()
+    else:
+        print("❌ Verbindung fehlgeschlagen")
+
 
 if __name__ == "__main__":
     test_mt5_client()

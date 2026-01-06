@@ -1,9 +1,0 @@
-{
-  "account": 12345678,
-  "password": "dein_demo_passwort",
-  "server": "MetaQuotes-Demo",
-  "symbol": "EURUSD",
-  "magic_number": 234000,
-  "deviation": 10,
-  "comment": "AI-Trading-Bot v4.1"
-}
